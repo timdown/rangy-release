@@ -1,6 +1,6 @@
 {
     "name": "rangy",
-    "version": "1.3.0-alpha.20150122",
+    "version": "1.2.3",
     "homepage": "https://github.com/timdown/rangy",
     "authors": [
         "Tim Down <tim@timdown.co.uk>"
@@ -8,16 +8,12 @@
     "description": "A cross-browser JavaScript range and selection library.",
     "main": [
         "rangy-core.min.js",
-        "rangy-classapplier.min.js",
-        "rangy-highlighter.min.js",
+        "rangy-cssclassapplier.min.js",
         "rangy-selectionsaverestore.min.js",
-        "rangy-serializer.min.js",
-        "rangy-textrange.min.js"
+        "rangy-serializer.min.js"
     ],
     "moduleType": [
-        "amd",
-        "globals",
-        "node"
+        "globals"
     ],
     "keywords": [
         "range",
