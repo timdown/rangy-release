@@ -24,10 +24,10 @@
  *
  * Depends on Rangy core.
  *
- * Copyright 2014, Tim Down
+ * Copyright 2015, Tim Down
  * Licensed under the MIT license.
- * Version: 1.3.0-alpha.20140921
- * Build date: 21 September 2014
+ * Version: 1.3.0-alpha.20150122
+ * Build date: 22 January 2015
  */
 
 /**
@@ -1428,8 +1428,7 @@
         function isWholeWord(startPos, endPos, wordOptions) {
             var range = api.createRange(startPos.node);
             range.setStartAndEnd(startPos.node, startPos.offset, endPos.node, endPos.offset);
-            var returnVal = !range.expand("word", wordOptions);
-            return returnVal;
+            return !range.expand("word", { wordOptions: wordOptions });
         }
 
         function findTextFromPosition(initialPos, searchTerm, isRegex, searchScopeRange, findOptions) {
