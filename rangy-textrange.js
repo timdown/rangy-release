@@ -24,10 +24,10 @@
  *
  * Depends on Rangy core.
  *
- * Copyright 2015, Tim Down
+ * Copyright 2024, Tim Down
  * Licensed under the MIT license.
- * Version: 1.3.0
- * Build date: 10 May 2015
+ * Version: 1.3.2
+ * Build date: 2 November 2024
  */
 
 /**

@@ -2,10 +2,10 @@
  * Rangy, a cross-browser JavaScript range and selection library
  * https://github.com/timdown/rangy
  *
- * Copyright 2015, Tim Down
+ * Copyright 2024, Tim Down
  * Licensed under the MIT license.
- * Version: 1.3.0
- * Build date: 10 May 2015
+ * Version: 1.3.2
+ * Build date: 2 November 2024
  */
 
 (function(factory, root) {
@@ -109,7 +109,7 @@
     };
 
     var api = {
-        version: "1.3.0",
+        version: "1.3.2",
         initialized: false,
         isBrowser: isBrowser,
         supported: true,
@@ -158,6 +158,9 @@
         util.extend = extend = function(obj, props, deep) {
             var o, p;
             for (var i in props) {
+                if (i === "__proto__" || i === "constructor" || i === "prototype") {
+                    continue;
+                }
                 if (props.hasOwnProperty(i)) {
                     o = obj[i];
                     p = props[i];
@@ -222,7 +225,7 @@
     })();
 
     // Very simple event handler wrapper function that doesn't attempt to solve issues such as "this" handling or
-    // normalization of event properties
+    // normalization of event properties because we don't need this.
     var addListener;
     if (isBrowser) {
         if (isHostMethod(document, "addEventListener")) {
@@ -1303,6 +1306,7 @@
         var getDocumentOrFragmentContainer = createAncestorFinder( [9, 11] );
         var getReadonlyAncestor = createAncestorFinder(readonlyNodeTypes);
         var getDocTypeNotationEntityAncestor = createAncestorFinder( [6, 10, 12] );
+        var getElementAncestor = createAncestorFinder( [1] );
 
         function assertNoDocTypeNotationEntityAncestor(node, allowSelf) {
             if (getDocTypeNotationEntityAncestor(node, allowSelf)) {
@@ -1365,7 +1369,7 @@
         var htmlParsingConforms = false;
         try {
             styleEl.innerHTML = "<b>x</b>";
-            htmlParsingConforms = (styleEl.firstChild.nodeType == 3); // Opera incorrectly creates an element node
+            htmlParsingConforms = (styleEl.firstChild.nodeType == 3); // Pre-Blink Opera incorrectly creates an element node
         } catch (e) {
             // IE 6 and 7 throw
         }
@@ -1966,6 +1970,12 @@
                             break;
                     }
 
+                    assertNoDocTypeNotationEntityAncestor(sc, true);
+                    assertValidOffset(sc, so);
+
+                    assertNoDocTypeNotationEntityAncestor(ec, true);
+                    assertValidOffset(ec, eo);
+
                     boundaryUpdater(this, sc, so, ec, eo);
                 },
 
@@ -2128,6 +2138,12 @@
                     assertNoDocTypeNotationEntityAncestor(node, true);
                     assertValidOffset(node, offset);
                     this.setStartAndEnd(node, offset);
+                },
+
+                parentElement: function() {
+                    assertRangeValid(this);
+                    var parentNode = this.commonAncestorContainer;
+                    return parentNode ? getElementAncestor(this.commonAncestorContainer, true) : null;
                 }
             });
 
@@ -2149,17 +2165,11 @@
             range.endContainer = endContainer;
             range.endOffset = endOffset;
             range.document = dom.getDocument(startContainer);
-
             updateCollapsedAndCommonAncestor(range);
         }
 
         function Range(doc) {
-            this.startContainer = doc;
-            this.startOffset = 0;
-            this.endContainer = doc;
-            this.endOffset = 0;
-            this.document = doc;
-            updateCollapsedAndCommonAncestor(this);
+            updateBoundaries(this, doc, 0, doc, 0);
         }
 
         createPrototypeRange(Range, updateBoundaries);
@@ -2793,7 +2803,7 @@
     /*----------------------------------------------------------------------------------------------------------------*/
 
     // This module creates a selection object wrapper that conforms as closely as possible to the Selection specification
-    // in the HTML Editing spec (http://dvcs.w3.org/hg/editing/raw-file/tip/editing.html#selections)
+    // in the W3C Selection API spec (https://www.w3.org/TR/selection-api)
     api.createCoreModule("WrappedSelection", ["DomRange", "WrappedRange"], function(api, module) {
         api.config.checkSelectionRanges = true;
 
@@ -2901,6 +2911,10 @@
         var selectionHasExtend = isHostMethod(testSelection, "extend");
         features.selectionHasExtend = selectionHasExtend;
 
+        // Test for existence of native selection setBaseAndExtent() method
+        var selectionHasSetBaseAndExtent = isHostMethod(testSelection, "setBaseAndExtent");
+        features.selectionHasSetBaseAndExtent = selectionHasSetBaseAndExtent;
+
         // Test if rangeCount exists
         var selectionHasRangeCount = (typeof testSelection.rangeCount == NUMBER);
         features.selectionHasRangeCount = selectionHasRangeCount;
@@ -2925,7 +2939,7 @@
                 // performed on the current document's selection. See issue 109.
 
                 // Note also that if a selection previously existed, it is wiped and later restored by these tests. This
-                // will result in the selection direction begin reversed if the original selection was backwards and the
+                // will result in the selection direction being reversed if the original selection was backwards and the
                 // browser does not support setting backwards selections (Internet Explorer, I'm looking at you).
                 var sel = window.getSelection();
                 if (sel) {
@@ -3040,6 +3054,11 @@
             sel.rangeCount = 0;
             sel.isCollapsed = true;
             sel._ranges.length = 0;
+            updateType(sel);
+        }
+
+        function updateType(sel) {
+            sel.type = (sel.rangeCount == 0) ? "None" : (selectionIsCollapsed(sel) ? "Caret" : "Range");
         }
 
         function getNativeRange(range) {
@@ -3089,6 +3108,7 @@
             updateAnchorAndFocusFromRange(sel, wrappedRange, false);
             sel.rangeCount = 1;
             sel.isCollapsed = wrappedRange.collapsed;
+            updateType(sel);
         }
 
         function updateControlSelection(sel) {
@@ -3113,6 +3133,7 @@
                     }
                     sel.isCollapsed = sel.rangeCount == 1 && sel._ranges[0].collapsed;
                     updateAnchorAndFocusFromRange(sel, sel._ranges[sel.rangeCount - 1], false);
+                    updateType(sel);
                 }
             }
         }
@@ -3182,6 +3203,7 @@
             sel.win = sel.anchorNode = sel.focusNode = sel._ranges = null;
             sel.rangeCount = sel.anchorOffset = sel.focusOffset = 0;
             sel.detached = true;
+            updateType(sel);
         }
 
         var cachedRangySelections = [];
@@ -3308,6 +3330,7 @@
                                 this._ranges[this.rangeCount - 1] = range;
                                 updateAnchorAndFocusFromRange(this, range, selectionIsBackward(this.nativeSelection));
                                 this.isCollapsed = selectionIsCollapsed(this);
+                                updateType(this);
                             } else {
                                 // The range was not added successfully. The simplest thing is to refresh
                                 this.refresh();
@@ -3376,6 +3399,7 @@
                     this.rangeCount = 1;
                     this.isCollapsed = this._ranges[0].collapsed;
                     updateAnchorAndFocusFromRange(this, range, false);
+                    updateType(this);
                 }
             };
 
@@ -3434,6 +3458,7 @@
                         }
                         updateAnchorAndFocusFromRange(sel, sel._ranges[sel.rangeCount - 1], selectionIsBackward(sel.nativeSelection));
                         sel.isCollapsed = selectionIsCollapsed(sel);
+                        updateType(sel);
                     } else {
                         updateEmptySelection(sel);
                     }
@@ -3448,6 +3473,7 @@
                     sel.rangeCount = 1;
                     updateAnchorAndFocusFromNativeSelection(sel);
                     sel.isCollapsed = selectionIsCollapsed(sel);
+                    updateType(sel);
                 } else {
                     updateEmptySelection(sel);
                 }
@@ -3566,6 +3592,12 @@
             }
         }
 
+        function assertValidOffset(node, offset) {
+            if (offset < 0 || offset > (dom.isCharacterDataNode(node) ? node.length : node.childNodes.length)) {
+                throw new DOMException("INDEX_SIZE_ERR");
+            }
+        }
+
         // No current browser conforms fully to the spec for this method, so Rangy's own method is always used
         selProto.collapse = function(node, offset) {
             assertNodeInSameDocument(this, node);
@@ -3601,6 +3633,28 @@
             range.selectNodeContents(node);
             this.setSingleRange(range);
         };
+
+        if (selectionHasSetBaseAndExtent) {
+            selProto.setBaseAndExtent = function(anchorNode, anchorOffset, focusNode, focusOffset) {
+                this.nativeSelection.setBaseAndExtent(anchorNode, anchorOffset, focusNode, focusOffset);
+                this.refresh();
+            };
+        } else if (selectionHasExtend) {
+            selProto.setBaseAndExtent = function(anchorNode, anchorOffset, focusNode, focusOffset) {
+                assertValidOffset(anchorNode, anchorOffset);
+                assertValidOffset(focusNode, focusOffset);
+                assertNodeInSameDocument(this, anchorNode);
+                assertNodeInSameDocument(this, focusNode);
+                var range = api.createRange(node);
+                var isBackwards = (dom.comparePoints(anchorNode, anchorOffset, focusNode, focusOffset) == -1);
+                if (isBackwards) {
+                    range.setStartAndEnd(focusNode, focusOffset, anchorNode, anchorOffset);
+                } else {
+                    range.setStartAndEnd(anchorNode, anchorOffset, focusNode, focusOffset);
+                }
+                this.setSingleRange(range, isBackwards);
+            };
+        }
 
         selProto.deleteFromDocument = function() {
             // Sepcial behaviour required for IE's control selections
